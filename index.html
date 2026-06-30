@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>レシピまとめ</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', sans-serif;
+      background: #f5f5f0;
+      color: #2d2d2d;
+      min-height: 100vh;
+    }
+
+    /* ヘッダー */
+    header {
+      background: #ff6b35;
+      color: white;
+      padding: 16px 20px 0;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+    header h1 { font-size: 20px; font-weight: 700; padding-bottom: 12px; }
+    .tab-bar {
+      display: flex;
+      gap: 4px;
+    }
+    .tab-bar button {
+      flex: 1;
+      background: none;
+      border: none;
+      color: rgba(255,255,255,0.7);
+      font-size: 14px;
+      font-weight: 600;
+      padding: 8px 0;
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
+      transition: all 0.2s;
+    }
+    .tab-bar button.active {
+      color: white;
+      border-bottom-color: white;
+    }
+
+    /* 画面 */
+    .screen { display: none; padding: 16px; }
+    .screen.active { display: block; }
+
+    /* 設定画面 */
+    .settings-card {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+    .settings-card h2 { font-size: 16px; font-weight: 700; margin-bottom: 12px; color: #ff6b35; }
+    .settings-card p { font-size: 13px; color: #666; margin-bottom: 12px; line-height: 1.6; }
+    .settings-card a { color: #ff6b35; }
+    label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: #444; }
+    input[type="text"], input[type="password"] {
+      width: 100%;
+      padding: 12px;
+      border: 1.5px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 14px;
+      margin-bottom: 12px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    input:focus { border-color: #ff6b35; }
+    .btn {
+      display: block;
+      width: 100%;
+      padding: 14px;
+      background: #ff6b35;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    .btn:active { opacity: 0.85; }
+    .btn.secondary {
+      background: #f0f0f0;
+      color: #444;
+      margin-top: 8px;
+    }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* 追加画面 */
+    .add-card {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+    .add-card h2 { font-size: 16px; font-weight: 700; margin-bottom: 16px; }
+
+    /* ローディング */
+    .loading {
+      display: none;
+      text-align: center;
+      padding: 40px 20px;
+    }
+    .loading.active { display: block; }
+    .spinner {
+      width: 40px; height: 40px;
+      border: 4px solid #f0f0f0;
+      border-top-color: #ff6b35;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 16px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading p { color: #666; font-size: 14px; }
+
+    /* エラー */
+    .error-msg {
+      background: #fff0f0;
+      border: 1px solid #ffcccc;
+      color: #cc3300;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      margin-top: 12px;
+      display: none;
+    }
+    .error-msg.active { display: block; }
+
+    /* レシピ一覧 */
+    .recipe-grid { display: flex; flex-direction: column; gap: 12px; }
+    .recipe-card {
+      background: white;
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .recipe-card:active { transform: scale(0.98); }
+    .recipe-emoji { font-size: 36px; flex-shrink: 0; }
+    .recipe-info { flex: 1; min-width: 0; }
+    .recipe-info h3 { font-size: 15px; font-weight: 700; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .recipe-info p { font-size: 12px; color: #999; }
+    .recipe-arrow { color: #ccc; font-size: 18px; flex-shrink: 0; }
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: #999;
+    }
+    .empty-state .big-icon { font-size: 60px; margin-bottom: 16px; }
+    .empty-state p { font-size: 14px; line-height: 1.6; }
+
+    /* レシピ詳細 */
+    .detail-screen { display: none; }
+    .detail-screen.active { display: block; }
+    .detail-back {
+      background: none;
+      border: none;
+      color: #ff6b35;
+      font-size: 15px;
+      font-weight: 600;
+      padding: 16px 20px 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .detail-content { padding: 0 16px 32px; }
+    .detail-title {
+      font-size: 22px;
+      font-weight: 800;
+      margin-bottom: 8px;
+    }
+    .detail-meta { font-size: 13px; color: #999; margin-bottom: 20px; }
+
+    .section {
+      background: white;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+    .section-title {
+      font-size: 14px;
+      font-weight: 800;
+      color: #ff6b35;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* 調味料・材料 */
+    .ingredient-group { margin-bottom: 12px; }
+    .ingredient-group-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: #999;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .ingredient-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid #f9f9f9;
+    }
+    .ingredient-row:last-child { border-bottom: none; }
+    .ingredient-name { font-size: 14px; }
+    .ingredient-amount { font-size: 14px; font-weight: 700; color: #ff6b35; }
+
+    /* 手順 */
+    .step-row {
+      display: flex;
+      gap: 12px;
+      padding: 10px 0;
+      border-bottom: 1px solid #f9f9f9;
+    }
+    .step-row:last-child { border-bottom: none; }
+    .step-num {
+      width: 28px;
+      height: 28px;
+      background: #ff6b35;
+      color: white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .step-text { font-size: 14px; line-height: 1.6; padding-top: 4px; }
+
+    /* コツ */
+    .tip-row {
+      display: flex;
+      gap: 8px;
+      padding: 6px 0;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+    .tip-row::before { content: "💡"; flex-shrink: 0; }
+
+    /* 削除ボタン */
+    .delete-btn {
+      display: block;
+      width: 100%;
+      padding: 14px;
+      background: none;
+      color: #cc3300;
+      border: 1.5px solid #ffcccc;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 8px;
+    }
+
+    /* YouTube動画リンク */
+    .yt-link {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px;
+      background: #fff5f2;
+      border-radius: 8px;
+      text-decoration: none;
+      color: #ff6b35;
+      font-size: 14px;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+
+<!-- メインUI -->
+<div id="main-ui">
+  <header>
+    <h1>🍳 レシピまとめ</h1>
+    <div class="tab-bar">
+      <button class="active" onclick="showTab('list')">レシピ一覧</button>
+      <button onclick="showTab('add')">＋ 追加</button>
+      <button onclick="showTab('settings')">設定</button>
+    </div>
+  </header>
+
+  <!-- 一覧画面 -->
+  <div id="screen-list" class="screen active">
+    <div id="recipe-grid" class="recipe-grid"></div>
+  </div>
+
+  <!-- 追加画面 -->
+  <div id="screen-add" class="screen">
+    <div class="add-card">
+      <h2>YouTubeからレシピを追加</h2>
+      <label>YouTubeのURL</label>
+      <input type="text" id="yt-url" placeholder="https://www.youtube.com/watch?v=..." />
+      <button class="btn" onclick="startExtract()">レシピを取得する</button>
+      <div class="error-msg" id="add-error"></div>
+    </div>
+    <div class="loading" id="add-loading">
+      <div class="spinner"></div>
+      <p id="loading-text">YouTubeから情報を取得中...</p>
+    </div>
+  </div>
+
+  <!-- 設定画面 -->
+  <div id="screen-settings" class="screen">
+    <div class="settings-card">
+      <h2>🔑 APIキーの設定</h2>
+      <p>このアプリを使うには、2つのAPIキーが必要です。<br>一度設定すると次回から不要です。</p>
+
+      <label>YouTube Data APIキー</label>
+      <input type="password" id="yt-api-key" placeholder="AIza..." />
+      <p style="font-size:12px;color:#999;margin-top:-8px;margin-bottom:12px;">
+        取得方法: <a href="https://console.cloud.google.com/" target="_blank">Google Cloud Console</a> →「YouTube Data API v3」を有効化
+      </p>
+
+      <label>Anthropic APIキー（Claudeのキー）</label>
+      <input type="password" id="claude-api-key" placeholder="sk-ant-..." />
+      <p style="font-size:12px;color:#999;margin-top:-8px;margin-bottom:12px;">
+        取得方法: <a href="https://console.anthropic.com/" target="_blank">Anthropic Console</a> →「API Keys」
+      </p>
+
+      <button class="btn" onclick="saveSettings()">設定を保存</button>
+      <div id="settings-msg" style="text-align:center;font-size:13px;color:#00aa44;margin-top:10px;display:none;">✅ 保存しました</div>
+    </div>
+
+    <div class="settings-card">
+      <h2>📖 使い方</h2>
+      <p>
+        1. 上の「設定」でAPIキーを入力・保存<br>
+        2. 「＋ 追加」タブでYouTubeのURLを貼り付け<br>
+        3. 「レシピを取得する」をタップ<br>
+        4. 自動でレシピが整理されて保存される
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- 詳細画面（別レイヤー） -->
+<div id="detail-screen" class="detail-screen">
+  <button class="detail-back" onclick="closeDetail()">← 一覧に戻る</button>
+  <div class="detail-content" id="detail-content"></div>
+</div>
+
+<script>
+  // =====================
+  // ストレージ
+  // =====================
+  function getSettings() {
+    return {
+      ytKey: localStorage.getItem('yt_api_key') || '',
+      claudeKey: localStorage.getItem('claude_api_key') || ''
+    };
+  }
+
+  function saveSettings() {
+    const ytKey = document.getElementById('yt-api-key').value.trim();
+    const claudeKey = document.getElementById('claude-api-key').value.trim();
+    localStorage.setItem('yt_api_key', ytKey);
+    localStorage.setItem('claude_api_key', claudeKey);
+    const msg = document.getElementById('settings-msg');
+    msg.style.display = 'block';
+    setTimeout(() => msg.style.display = 'none', 2000);
+  }
+
+  function getRecipes() {
+    return JSON.parse(localStorage.getItem('recipes') || '[]');
+  }
+
+  function saveRecipes(recipes) {
+    localStorage.setItem('recipes', JSON.stringify(recipes));
+  }
+
+  // =====================
+  // タブ切り替え
+  // =====================
+  function showTab(tab) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.tab-bar button').forEach(b => b.classList.remove('active'));
+    document.getElementById('screen-' + tab).classList.add('active');
+    document.querySelectorAll('.tab-bar button')[['list','add','settings'].indexOf(tab)].classList.add('active');
+
+    if (tab === 'list') renderList();
+    if (tab === 'settings') {
+      const s = getSettings();
+      if (s.ytKey) document.getElementById('yt-api-key').value = s.ytKey;
+      if (s.claudeKey) document.getElementById('claude-api-key').value = s.claudeKey;
+    }
+  }
+
+  // =====================
+  // レシピ一覧
+  // =====================
+  const FOOD_EMOJIS = ['🍜','🍛','🍣','🍱','🥗','🍝','🍖','🥘','🍲','🥩','🍤','🥞','🍙','🍚','🥚'];
+
+  function renderList() {
+    const grid = document.getElementById('recipe-grid');
+    const recipes = getRecipes();
+
+    if (recipes.length === 0) {
+      grid.innerHTML = `
+        <div class="empty-state">
+          <div class="big-icon">🍽️</div>
+          <p>まだレシピがありません<br>「＋ 追加」からYouTubeのURLを<br>貼り付けてみましょう</p>
+        </div>`;
+      return;
+    }
+
+    grid.innerHTML = recipes.map((r, i) => `
+      <div class="recipe-card" onclick="openDetail(${i})">
+        <div class="recipe-emoji">${r.emoji || '🍳'}</div>
+        <div class="recipe-info">
+          <h3>${r.dish_name}</h3>
+          <p>${r.servings || ''} · ${r.added_at}</p>
+        </div>
+        <div class="recipe-arrow">›</div>
+      </div>
+    `).join('');
+  }
+
+  // =====================
+  // 詳細画面
+  // =====================
+  function openDetail(index) {
+    const recipes = getRecipes();
+    const r = recipes[index];
+
+    const mainIngredients = (r.ingredients || []).filter(i => i.category === 'main');
+    const seasonings = (r.ingredients || []).filter(i => i.category === 'seasoning');
+    const others = (r.ingredients || []).filter(i => i.category === 'other');
+
+    function ingredientGroup(title, items) {
+      if (items.length === 0) return '';
+      return `
+        <div class="ingredient-group">
+          <div class="ingredient-group-title">${title}</div>
+          ${items.map(i => `
+            <div class="ingredient-row">
+              <span class="ingredient-name">${i.name}</span>
+              <span class="ingredient-amount">${i.amount}</span>
+            </div>
+          `).join('')}
+        </div>`;
+    }
+
+    const tipsHtml = r.tips && r.tips.length > 0 ? `
+      <div class="section">
+        <div class="section-title">💡 コツ・ポイント</div>
+        ${r.tips.map(t => `<div class="tip-row">${t}</div>`).join('')}
+      </div>` : '';
+
+    document.getElementById('detail-content').innerHTML = `
+      <div class="detail-title">${r.emoji || '🍳'} ${r.dish_name}</div>
+      <div class="detail-meta">${r.servings || ''} · ${r.added_at}</div>
+
+      ${r.video_url ? `<a class="yt-link" href="${r.video_url}" target="_blank">▶ YouTubeで元動画を見る</a><br>` : ''}
+
+      <div class="section">
+        <div class="section-title">🧂 調味料</div>
+        ${ingredientGroup('', seasonings)}
+        ${seasonings.length === 0 ? '<p style="color:#999;font-size:13px;">情報なし</p>' : ''}
+      </div>
+
+      <div class="section">
+        <div class="section-title">🥕 材料</div>
+        ${ingredientGroup('主な材料', mainIngredients)}
+        ${ingredientGroup('その他', others)}
+        ${mainIngredients.length === 0 && others.length === 0 ? '<p style="color:#999;font-size:13px;">情報なし</p>' : ''}
+      </div>
+
+      <div class="section">
+        <div class="section-title">📋 手順</div>
+        ${(r.steps || []).map((s, i) => `
+          <div class="step-row">
+            <div class="step-num">${i + 1}</div>
+            <div class="step-text">${s}</div>
+          </div>
+        `).join('')}
+      </div>
+
+      ${tipsHtml}
+
+      <button class="delete-btn" onclick="deleteRecipe(${index})">🗑 このレシピを削除</button>
+    `;
+
+    document.getElementById('main-ui').style.display = 'none';
+    document.getElementById('detail-screen').classList.add('active');
+    window.scrollTo(0, 0);
+  }
+
+  function closeDetail() {
+    document.getElementById('main-ui').style.display = 'block';
+    document.getElementById('detail-screen').classList.remove('active');
+    renderList();
+  }
+
+  function deleteRecipe(index) {
+    if (!confirm('このレシピを削除しますか？')) return;
+    const recipes = getRecipes();
+    recipes.splice(index, 1);
+    saveRecipes(recipes);
+    closeDetail();
+  }
+
+  // =====================
+  // レシピ取得
+  // =====================
+  function extractVideoId(url) {
+    const patterns = [
+      /(?:youtube\.com\/watch\?v=)([^&\n?#]+)/,
+      /(?:youtu\.be\/)([^&\n?#]+)/,
+      /(?:youtube\.com\/shorts\/)([^&\n?#]+)/,
+    ];
+    for (const p of patterns) {
+      const m = url.match(p);
+      if (m) return m[1];
+    }
+    return null;
+  }
+
+  function showError(msg) {
+    const el = document.getElementById('add-error');
+    el.textContent = msg;
+    el.classList.add('active');
+  }
+
+  function hideError() {
+    document.getElementById('add-error').classList.remove('active');
+  }
+
+  function setLoading(active, text) {
+    const loading = document.getElementById('add-loading');
+    const card = document.querySelector('.add-card');
+    if (active) {
+      loading.classList.add('active');
+      card.style.display = 'none';
+      document.getElementById('loading-text').textContent = text || '処理中...';
+    } else {
+      loading.classList.remove('active');
+      card.style.display = 'block';
+    }
+  }
+
+  async function startExtract() {
+    hideError();
+    const url = document.getElementById('yt-url').value.trim();
+    const { ytKey, claudeKey } = getSettings();
+
+    if (!url) { showError('URLを入力してください'); return; }
+    if (!ytKey || !claudeKey) { showError('先に「設定」タブでAPIキーを入力してください'); return; }
+
+    const videoId = extractVideoId(url);
+    if (!videoId) { showError('YouTubeのURLが正しくありません'); return; }
+
+    try {
+      // Step 1: YouTube情報取得
+      setLoading(true, '📺 YouTubeから動画情報を取得中...');
+      const videoRes = await fetch(
+        `https://www.googleapis.com/youtube/v3/videos?id=${videoId}&part=snippet&key=${ytKey}`
+      );
+      const videoData = await videoRes.json();
+
+      if (!videoData.items || videoData.items.length === 0) {
+        setLoading(false);
+        showError('動画が見つかりませんでした。URLを確認してください。');
+        return;
+      }
+
+      const snippet = videoData.items[0].snippet;
+      const title = snippet.title;
+      const description = snippet.description || '';
+
+      // Step 2: コメント取得（失敗してもOK）
+      setLoading(true, '💬 コメントを確認中...');
+      let comments = '';
+      try {
+        const commentsRes = await fetch(
+          `https://www.googleapis.com/youtube/v3/commentThreads?videoId=${videoId}&part=snippet&maxResults=30&order=relevance&key=${ytKey}`
+        );
+        const commentsData = await commentsRes.json();
+        if (commentsData.items) {
+          comments = commentsData.items
+            .map(item => item.snippet.topLevelComment.snippet.textDisplay)
+            .join('\n');
+        }
+      } catch(e) { /* コメントなしでも続行 */ }
+
+      // Step 3: Claude APIでレシピ抽出
+      setLoading(true, '🤖 AIがレシピを整理中...');
+      const prompt = `以下はYouTube料理動画「${title}」の概要欄とコメントです。
+レシピ情報を抽出してJSONで返してください。
+
+概要欄:
+${description.slice(0, 3000)}
+
+コメント（上位）:
+${comments.slice(0, 2000)}
+
+以下のJSON形式のみで返答してください（説明文は不要）:
+{
+  "dish_name": "料理名（シンプルに）",
+  "servings": "2人分",
+  "ingredients": [
+    {"name": "鶏もも肉", "amount": "300g", "category": "main"},
+    {"name": "醤油", "amount": "大さじ2", "category": "seasoning"}
+  ],
+  "steps": [
+    "鶏肉を一口大に切る",
+    "フライパンを熱して油を引く"
+  ],
+  "tips": ["皮目からしっかり焼くとパリッとなる"]
+}
+
+categoryは main（主材料）/ seasoning（調味料）/ other（その他）のいずれか。
+情報が見当たらない場合は空配列にしてください。`;
+
+      const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': claudeKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true'
+        },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 2000,
+          messages: [{ role: 'user', content: prompt }]
+        })
+      });
+
+      const claudeData = await claudeRes.json();
+      if (!claudeData.content) {
+        setLoading(false);
+        showError('Claude APIエラー: ' + (claudeData.error?.message || '不明なエラー'));
+        return;
+      }
+
+      const text = claudeData.content[0].text;
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        setLoading(false);
+        showError('レシピの解析に失敗しました。別の動画で試してください。');
+        return;
+      }
+
+      const recipe = JSON.parse(jsonMatch[0]);
+      recipe.video_url = url;
+      recipe.added_at = new Date().toLocaleDateString('ja-JP');
+      recipe.emoji = FOOD_EMOJIS[Math.floor(Math.random() * FOOD_EMOJIS.length)];
+
+      // 保存
+      const recipes = getRecipes();
+      recipes.unshift(recipe);
+      saveRecipes(recipes);
+
+      setLoading(false);
+      document.getElementById('yt-url').value = '';
+      showTab('list');
+
+    } catch(e) {
+      setLoading(false);
+      showError('エラーが発生しました: ' + e.message);
+    }
+  }
+
+  // =====================
+  // 初期化
+  // =====================
+  renderList();
+</script>
+</body>
+</html>
